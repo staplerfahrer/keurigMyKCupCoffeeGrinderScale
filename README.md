@@ -28,4 +28,4 @@ See app.js how these are used.
 GET /config will let you upload new HTML or JavaScript. The limit is 3000 bytes, so I used uglifyjs to shrink the JS file before uploading.
 GET /flash will erase the ESP32 flash memory if you ever have problems getting /config to save your JS or HTML changes.
 
-Simply connect your device to the AP called **Angle of the ~Dangle~**, password **12345678**, and see the scale in action.
+Simply connect your device to the AP called **Angle of the \~Dangle\~**, password **12345678**, and see the scale in action.
