@@ -23,7 +23,7 @@ void setup() {
 	// Serial
 	Serial.begin(115200);
 
-	// HX711 
+	// HX711
 	// https://www.digikey.com/htmldatasheets
 	// /production/1836471/0/0/1/hx711.html
 	pinMode(HX711_PD_SCK, OUTPUT);
@@ -66,7 +66,7 @@ void setup() {
 void loop() {
 	NetworkClient client = server.accept();
 	if (!client) return;
-	
+
 	String requestLine = "";
 	char   prefByteBuf[PREF_BUF_LEN];
 	int    prefByteBufPos = 0;
@@ -74,7 +74,7 @@ void loop() {
 	bool   isPostRequest = false;
 	bool   headersReceived = false;
 	uint   contentLength = 0;
-	size_t saved = 0;
+	size_t prefByteCount = 0;
 	for (int i = 0; i < PREF_BUF_LEN; i++) {
 		prefByteBuf[i] = ' ';
 	}
@@ -82,7 +82,7 @@ void loop() {
 	while (client.connected()) {
 		if (!client.available()) continue;
 
-		char c = client.read(); 
+		char c = client.read();
 		SERIAL_OUT(c);
 
 		if (!headersReceived) {
@@ -104,7 +104,7 @@ void loop() {
 
 	// request is done
 	switch (route) {
-		case 1: 
+		case 1:
 			// GET /
 			prefs.getBytes("html", prefByteBuf, PREF_BUF_LEN);
 			client.println("HTTP/1.1 200 OK");
@@ -114,7 +114,7 @@ void loop() {
 			client.println();
 			client.write(prefByteBuf, PREF_BUF_LEN);
 			break;
-		case 2: 
+		case 2:
 			// GET /js
 			prefs.getBytes("js", prefByteBuf, PREF_BUF_LEN);
 			client.println("HTTP/1.1 200 OK");
@@ -124,7 +124,7 @@ void loop() {
 			client.println();
 			client.write(prefByteBuf, PREF_BUF_LEN);
 			break;
-		case 3: 
+		case 3:
 			// GET /adcCount
 			char adcJson[32];
 			snprintf(adcJson, sizeof adcJson, "{\"adcCount\":%d}", readAdcCount());
@@ -135,7 +135,7 @@ void loop() {
 			client.println();
 			client.print(adcJson);
 			break;
-		case 4: 
+		case 4:
 			// GET /config
 			client.println("HTTP/1.1 200 OK");
 			client.println("Content-Type: text/html");
@@ -148,23 +148,23 @@ void loop() {
 			prefs.getBytes("js", prefByteBuf, PREF_BUF_LEN);
 			client.write(prefByteBuf, PREF_BUF_LEN);
 			break;
-		case 5: 
+		case 5:
 			// POST /submit/html
 			SERIAL_OUTLN(prefByteBuf);
-			saved = prefs.putBytes("html", prefByteBuf, PREF_BUF_LEN);
+			prefByteCount = prefs.putBytes("html", prefByteBuf, PREF_BUF_LEN);
 			client.println("HTTP/1.1 200 OK");
 			client.println("Content-Type: text/html");
 			client.println();
-			client.println(saved);
+			client.println(prefByteCount);
 			break;
-		case 6: 
+		case 6:
 			// POST /submit/js
 			SERIAL_OUTLN(prefByteBuf);
-			saved = prefs.putBytes("js", prefByteBuf, PREF_BUF_LEN);
+			prefByteCount = prefs.putBytes("js", prefByteBuf, PREF_BUF_LEN);
 			client.println("HTTP/1.1 200 OK");
 			client.println("Content-Type: text/html");
 			client.println();
-			client.println(saved);
+			client.println(prefByteCount);
 			break;
 		case 7:
 			// /flash
@@ -172,22 +172,53 @@ void loop() {
 			nvs_flash_erase();
 			nvs_flash_init();
 			Serial.println(">>> DONE FLASHING. <<<");
+			client.println("HTTP/1.1 200 OK");
+			client.println("Content-Type: text/html");
+			client.println();
 			break;
 		case 8:
 			// /switch/on
 			Serial.println("switching SSR ON");
 			digitalWrite(SSR_EN, HIGH);
+			client.println("HTTP/1.1 200 OK");
+			client.println("Content-Type: text/html");
+			client.println();
 			break;
 		case 9:
 			// /switch/off
 			Serial.println("switching SSR OFF");
 			digitalWrite(SSR_EN, LOW);
+			client.println("HTTP/1.1 200 OK");
+			client.println("Content-Type: text/html");
+			client.println();
+			break;
+		case 10:
+			// GET /settings
+			prefByteCount = prefs.getBytes("settings", prefByteBuf, PREF_BUF_LEN);
+			client.println("HTTP/1.1 200 OK");
+			client.println("Content-Type: application/json");
+			client.print("Content-Length: ");
+			client.println(prefByteCount > 0 ? PREF_BUF_LEN : 2);
+			client.println();
+			if (prefByteCount > 0)
+				client.write(prefByteBuf, PREF_BUF_LEN);
+			else
+				client.println("{}");
+			break;
+		case 11:
+			// POST /settings
+			SERIAL_OUTLN(prefByteBuf);
+			prefByteCount = prefs.putBytes("settings", prefByteBuf, PREF_BUF_LEN);
+			client.println("HTTP/1.1 200 OK");
+			client.println("Content-Type: text/html");
+			client.println();
+			client.println(prefByteCount);
 			break;
 	}
 	client.stop();
 }
 
-bool headerStuff(char c, String* requestLine, bool* headersReceived, 
+bool headerStuff(char c, String* requestLine, bool* headersReceived,
 		uint* contentLength, int* route, bool* isPostRequest) {
 	if ((*requestLine).endsWith("GET /")) {
 		*route = 1;
@@ -209,11 +240,15 @@ bool headerStuff(char c, String* requestLine, bool* headersReceived,
 		*route = 8;
 	} else if ((*requestLine).endsWith("PUT /switch/off")) {
 		*route = 9;
+	} else if ((*requestLine).endsWith("GET /settings")) {
+		*route = 10;
+	} else if ((*requestLine).endsWith("POST /settings")) {
+		*route = 11;
 	}
 
 	if (c == '\r') {
 		// "continue" while loop, read the nest request byte
-		return true; 
+		return true;
 	}
 
 	if (c == '\n' && (*requestLine).startsWith("Content-Length")) {
@@ -221,11 +256,11 @@ bool headerStuff(char c, String* requestLine, bool* headersReceived,
 		*contentLength = getDigits(requestLine);
 	}
 
-	if (c == '\n' && (*requestLine).length() > 0) { 
+	if (c == '\n' && (*requestLine).length() > 0) {
 		// move on to next header line
 		*requestLine = "";
 		// "continue" while loop, read the nest request byte
-		return true; 
+		return true;
 	}
 
 	if (c == '\n' && (*requestLine).length() == 0) {
@@ -233,7 +268,7 @@ bool headerStuff(char c, String* requestLine, bool* headersReceived,
 		// change request mode
 		*headersReceived = true;
 		// "continue" while loop, read the nest request byte
-		return true; 
+		return true;
 	}
 
 	// keep going & add the request byte to requestLine
@@ -269,7 +304,7 @@ int readAdcCount() {
 		digitalWrite(HX711_PD_SCK, LOW);
 		delayMicroseconds(2);
 		// first bit HIGH => NEGATIVE 2's complement so pad with ones
-		if (i == 0 && bit == HIGH) twosComp24b = 0xFF000000; 
+		if (i == 0 && bit == HIGH) twosComp24b = 0xFF000000;
 		twosComp24b |= bit << (23 - i);
 	}
 	digitalWrite(HX711_PD_SCK, HIGH);
