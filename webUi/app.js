@@ -3,13 +3,13 @@ if (app && app.exit) app.exit()
 var app=(_=>{
 	'use strict'
 	const knobs = {
-		/* gStb        */ gStb:      1,
-		/* medLn       */ mLn :      9,
-		/* inCalZero   */ i0  :      0,
-		/* inCalHigh   */ iOH : 111500,
-		/* highWeightG */ hWG :  487.4,
-		/* onAboveG    */ ssrT:     19,
-		/* dispenseG   */ ssrF:     12,
+		/* gStb            */ gStb:       1,
+		/* medLn           */ mLn :    3*12,
+		/* inCalZero       */ i0  :       0, /* not actually */
+		/* inCalHighOffset */ iOH : 348_491, /* offset above the actual zero point, usually around -230_000
+		/* highWeightG     */ hWG :   487.4,
+		/* onAboveG        */ ssrT:      19,
+		/* dispenseG       */ ssrF:      12,
 	}
 
 	// JS convenience
@@ -63,8 +63,8 @@ var app=(_=>{
 	}
 
 	var scaleZeroCt=_=>+$('#inCalZero').value
-	var ctPerGram=_=>(scaleHighCt()-scaleZeroCt())/knobs.hWG
-	var scaleHighCt=_=>+$('#inCalHigh').value
+	var ctPerGram=_=>scaleHighOffset()/knobs.hWG
+	var scaleHighOffset=_=>+$('#inCalHighOffset').value
 	var onAboveG=_=>+$('#onAboveG').value
 	var dispenseG=_=>+$('#dispenseG').value
 	var weight=x=>(x-scaleZeroCt())/ctPerGram()
@@ -74,12 +74,13 @@ var app=(_=>{
 
 	var toZero=_=>appState.toZero()
 	var calZero=(filt,offset)=>$('#inCalZero').value=rnd(filt-offset)
-	var calHigh=filt=>$('#inCalHigh').value=filt-scaleZeroCt()
+	var calHigh=filt=>$('#inCalHighOffset').value=filt-scaleZeroCt()
 
 	$('#btCalZero').onclick=toZero
 	$('#inCalZero').value=knobs.i0
-	$('#btCalHigh').onclick=calHigh
-	$('#inCalHigh').value=knobs.iOH
+	$('#btCalHighOffset').onclick=calHigh
+	$('#btCalHighOffset').innerText=`${knobs.hWG} g offset`
+	$('#inCalHighOffset').value=knobs.iOH
 	$('#onAboveG').value=knobs.ssrT
 	$('#dispenseG').value=knobs.ssrF
 
