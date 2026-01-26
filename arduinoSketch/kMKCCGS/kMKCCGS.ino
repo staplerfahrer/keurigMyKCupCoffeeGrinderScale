@@ -4,8 +4,8 @@
 #include <WiFiAP.h>
 #include <NetworkClient.h>
 
-#define SERIAL_OUT   //Serial.print
-#define SERIAL_OUTLN //Serial.println
+#define SERIAL_OUT   Serial.print
+#define SERIAL_OUTLN Serial.println
 #define HX711_PD_SCK 4
 #define HX711_DOUT   5
 #define SSR_EN       2
@@ -244,6 +244,7 @@ bool headerStuff(char c, String* requestLine, bool* headersReceived,
 		*route = 10;
 	} else if ((*requestLine).endsWith("POST /settings")) {
 		*route = 11;
+		*isPostRequest = true;
 	}
 
 	if (c == '\r') {

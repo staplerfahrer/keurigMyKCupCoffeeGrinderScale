@@ -1,22 +1,31 @@
 <!DOCTYPE html>
 <html>
 <head><style>
-body					{ text-align: center; overflow: hidden; }
-*						{ font-family: 'Cascadia Mono'; font-size: 30px; }
-span:has(+input), input	{ display: inline-block; width: 10em; }
-input					{ text-align: right; }
-#live					{ width: 1000px; margin:0 auto; }
-#chart					{ overflow-x: hidden; width: 1000px; margin: 0 auto; border: 1px solid #ccc;
+body                      { text-align: center; overflow: hidden; }
+*                         { font-family: 'Cascadia Mono'; font-size: 30px; }
+.knobs span, .knobs input { display: inline-block; width: 10em; }
+.knobs span[id]           { cursor: pointer; background-color: #ddd; }
+input                     { text-align: right; }
+#live                     { width: 1000px; margin:0 auto; }
+#chart                    {
+	overflow-x: hidden;
+	width: 1000px;
+	margin: 0 auto;
+	border: 1px solid #ccc;
 	background: repeating-linear-gradient(to right, #00000000 0, #00000000 70.5px, #ccc 70.5px, #ccc 71.5px);
 }
 </style></head>
 <body>
 	<div id="status"></div><br>
-	<span id="btCalZero">Zero count</span> <input id="inCalZero"><br>
-	<span id="btCalHighOffset"></span>     <input id="inCalHighOffset"><br>
-	&nbsp;&nbsp;<span>Turn ON at</span>    <input id="onAboveG"  type="number"> g<br>
-	&nbsp;&nbsp;<span>and dispense</span>  <input id="dispenseG" type="number"> g<br>
-	<br>
+	<div class="knobs">
+		<span id="btCalZero">Zero count</span> <input id="inCalZero"><br>
+		<span id="btCalHighOffset"></span>     <input id="inCalHighOffset"><br>
+		&nbsp;&nbsp;<span>Turn ON at</span>    <input id="onAboveG"  type="number"> g<br>
+		&nbsp;&nbsp;<span>and dispense</span>  <input id="dispenseG" type="number"> g<br>
+		<p>
+			<span id="save">Save</span>
+		</p>
+	</div>
 	<div id="readout"></div><br>
 	<div id="live"></div>
 	<div id="chart">

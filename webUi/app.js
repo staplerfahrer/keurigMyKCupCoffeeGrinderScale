@@ -2,18 +2,67 @@ if (app && app.exit) app.exit()
 
 var app=(_=>{
 	'use strict'
-	const knobs = {
-		/* gStb            */ gStb:       1,
-		/* medLn           */ mLn :    3*12,
-		/* inCalZero       */ i0  :       0, /* not actually */
-		/* inCalHighOffset */ iOH : 348_491, /* offset above the actual zero point, usually around -230_000
-		/* highWeightG     */ hWG :   487.4,
-		/* onAboveG        */ ssrT:      19,
-		/* dispenseG       */ ssrF:      12,
+	var knobs = {
+		stableGramsLimit           :       1,
+		medianSampleCount          :      18,
+		zeroCalibrationReading     :       0, /* not actually */
+		highWeightCalibrationOffset: 348_491, /* offset above the actual zero point, usually around -230_000 */
+		highWeightCalibrationWeight:   487.4,
+		relayOnAboveG              :      19,
+		relayDispenseG             :      12,
 	}
 
 	// JS convenience
 	var m=Math,rnd=m.round,abs=m.abs,max=m.max,min=m.min,flr=m.floor,$doc=document,$=i=>$doc.querySelector(i)
+
+	// Data I/O
+	var reqXhr
+	var reqRaw=_=>{reqXhr=new XMLHttpRequest();reqXhr.timeout=150;reqXhr.open('GET','/adcCount',!0);reqXhr.onreadystatechange=newData;reqXhr.send()}
+	var reqRelay=mode=>{var ssr=new XMLHttpRequest();ssr.timeout=150;ssr.open('PUT','/switch/'+(mode?'on':'off'),!0);ssr.onreadystatechange=_=>false;ssr.send()}
+	var reqLoadSettings=cb=>{var settingsXhr=new XMLHttpRequest();settingsXhr.timeout=3000;settingsXhr.open('GET','/settings',!0);settingsXhr.onreadystatechange=_=>cb(settingsXhr);settingsXhr.send()}
+	var reqSaveSettings=_=>{var settingsXhr=new XMLHttpRequest();settingsXhr.timeout=3000;settingsXhr.open('POST','/settings',!0);settingsXhr.onreadystatechange=_=>false;settingsXhr.send(JSON.stringify(knobs))}
+	var schUpd=_=>setTimeout(reqRaw, 1)
+
+	var newData=_=>{
+		if(reqXhr.readyState!==4)
+			return
+		var jsn
+		if(''===(jsn=reqXhr.responseText))
+			return schUpd()
+
+		var raw=JSON.parse(jsn)['adcCount']
+		meds.shift();meds.push(raw)
+		var median=a=>{var s=a.toSorted((a,b)=>a-b);return s[flr(s.length/2)] || 0}
+		var med=median(meds)
+
+		filt=med*.5+filt*.5
+		var wt = weight(filt)
+
+		if (appState.isZero()) {
+			if (!isStable(raw, filt))
+				appState.toUnstable()
+		} else if (appState.isUnstable()) {
+			if (isStable(raw, filt)) {
+				if (knobs.zeroCalibrationReading === 0 || (wt !== null && wt < knobs.stableGramsLimit)) {
+					appState.toZero()
+				} else {
+					appState.toWeight()
+					wtCt = filt - knobs.zeroCalibrationReading
+				}
+			}
+		} else if (appState.isWeight()) {
+			if (!isStable(raw, filt))
+				appState.toUnstable()
+		} else if (appState.isExit()) {
+			return
+		}
+		if (appState.isZero()) calZero(filt, 0)
+		if (appState.isWeight()) calZero(filt, wtCt)
+
+		updateRelay(wt)
+		updateUi(raw, filt, wt)
+		schUpd()
+	}
 
 	// App state
 	var state=0,STUNST=0,STZERO=1,STWGHT=2,STEXIT=3
@@ -28,7 +77,7 @@ var app=(_=>{
 		}
 		state=s
 	}
-	const appState = {
+	var appState = {
 		toUnstable  : _=>stateChange(STUNST),
 		toZero      : _=>stateChange(STZERO),
 		toWeight    : _=>stateChange(STWGHT),
@@ -56,33 +105,28 @@ var app=(_=>{
 	// Scale stability
 	var stableCount=0
 	var isStable=(noisy,clean)=>{
-		stableCount = abs(noisy - clean) < ctPerGram() * knobs.gStb
+		stableCount = abs(noisy - clean) < ctPerGram() * knobs.stableGramsLimit
 			? min(stableCount + 1, 100)
 			: 0
 		return stableCount > 10
 	}
 
-	var scaleZeroCt=_=>+$('#inCalZero').value
-	var ctPerGram=_=>scaleHighOffset()/knobs.hWG
-	var scaleHighOffset=_=>+$('#inCalHighOffset').value
-	var onAboveG=_=>+$('#onAboveG').value
-	var dispenseG=_=>+$('#dispenseG').value
-	var weight=x=>(x-scaleZeroCt())/ctPerGram()
-
 	var filt=0,wtCt=0
-	var meds=[];meds.length=knobs.mLn
+	var meds=[];meds.length=knobs.medianSampleCount
 
-	var toZero=_=>appState.toZero()
-	var calZero=(filt,offset)=>$('#inCalZero').value=rnd(filt-offset)
-	var calHigh=filt=>$('#inCalHighOffset').value=filt-scaleZeroCt()
+	var ctPerGram = _              => knobs.highWeightCalibrationOffset / knobs.highWeightCalibrationWeight
+	var weight    = filt           => (filt - knobs.zeroCalibrationReading) / ctPerGram()
+	var calZero   = (filt, offset) => knobs.zeroCalibrationReading = rnd(filt-offset)
 
-	$('#btCalZero').onclick=toZero
-	$('#inCalZero').value=knobs.i0
-	$('#btCalHighOffset').onclick=calHigh
-	$('#btCalHighOffset').innerText=`${knobs.hWG} g offset`
-	$('#inCalHighOffset').value=knobs.iOH
-	$('#onAboveG').value=knobs.ssrT
-	$('#dispenseG').value=knobs.ssrF
+	$('#btCalZero').onclick         = _=> appState.toZero()
+	$('#btCalHighOffset').onclick   = _=>$('#inCalHighOffset').value = filt - knobs.zeroCalibrationReading
+	$('#btCalHighOffset').innerText = `${knobs.highWeightCalibrationWeight} g offset`
+	$('#inCalHighOffset').value     = knobs.highWeightCalibrationOffset
+	$('#onAboveG').value            = knobs.relayOnAboveG
+	$('#onAboveG').onchange         = e=>knobs.relayOnAboveG=+e.target.value
+	$('#dispenseG').value           = knobs.relayDispenseG
+	$('#dispenseG').onchange        = e=>knobs.relayDispenseG=+e.target.value
+	$('#save').onclick              = reqSaveSettings
 
 	// UI
 	var chart=(_=>{
@@ -97,24 +141,25 @@ var app=(_=>{
 			c.insertBefore(makeBar(norm(filt)*10**4,3,1,max(filt-raw,0),max(raw-filt,0)),c.firstChild);while(c.children.length>1000/*bars*/){c.removeChild(c.lastChild)}
 		}
 		return {
-			'live':live,
-			'trace':trace,
+			live:  live,
+			trace: trace,
 		}
 	})(appState)
 
 	var updateUi=(raw, filt, wt)=>{
 		chart.live(raw)
 		chart.trace(filt, raw)
-		var rptW=Number(rnd(wt/knobs.gStb)*knobs.gStb).toFixed(2).split('.')
-		$('#status').innerText = `ADC ${raw} | ${appState.isUnstable()?'UNSTABLE':appState.isZero()?'zero':'weight'} ${!appState.isUnstable()?' in '+appState.unstableTime()+' s':''}`
-		$('#readout').innerHTML=`${rptW[0]}.<span style="color:#ccc">${rptW[1]}</span> g`
+		var rptW=Number(rnd(wt/knobs.stableGramsLimit)*knobs.stableGramsLimit).toFixed(2).split('.')
+		$('#status').innerText  = `ADC ${raw} | ${appState.isUnstable()?'UNSTABLE':appState.isZero()?'zero':'weight'} ${!appState.isUnstable()?' in '+appState.unstableTime()+' s':''}`
+		$('#readout').innerHTML =`${rptW[0]}.<span style="color:#ccc">${rptW[1]}</span> g`
+		$('#inCalZero').value   = knobs.zeroCalibrationReading
 	}
 
 	// Relay state switching
 	var updateRelay=weight=>{
 		var nowOn = false, stateChanged = false
-		if (weight > onAboveG()) nowOn = true
-		if (weight > onAboveG()+dispenseG()) nowOn = false
+		if (weight > knobs.relayOnAboveG) nowOn = true
+		if (weight > knobs.relayOnAboveG + knobs.ssrDispenseG) nowOn = false
 
 		stateChanged = nowOn ? appState.toRelayOn() : appState.toRelayOff()
 		if (stateChanged) {
@@ -122,54 +167,14 @@ var app=(_=>{
 		}
 	}
 
-	// Data I/O
-	var reqXhr
-	var reqRaw=_=>{reqXhr=new XMLHttpRequest();reqXhr.timeout=150;reqXhr.open('GET','/adcCount',!0);reqXhr.onreadystatechange=newData;reqXhr.send()}
-	var reqRelay=mode=>{var ssr=new XMLHttpRequest();ssr.timeout=150;ssr.open('PUT','/switch/'+(mode?'on':'off'),!0);ssr.onreadystatechange=_=>false;ssr.send()}
-	var schUpd=_=>setTimeout(reqRaw, 1)
-	var newData=_=>{
-		var jsn,raw=0
-		if(reqXhr.readyState!==4)
-			return
-		if(''===(jsn=reqXhr.responseText))
-			return schUpd()
-
-		raw=JSON.parse(jsn)['adcCount']
-		meds.shift();meds.push(raw)
-		var median=a=>{var s=a.toSorted((a,b)=>a-b);return s[flr(s.length/2)] || 0}
-		var med=median(meds)
-
-		filt=med*.5+filt*.5
-		var wt = weight(filt)
-
-		if (appState.isZero()) {
-			if (!isStable(raw, filt))
-				appState.toUnstable()
-		} else if (appState.isUnstable()) {
-			if (isStable(raw, filt)) {
-				if (scaleZeroCt() === 0 || (wt !== null && wt < knobs.gStb)) {
-					appState.toZero()
-				} else {
-					appState.toWeight()
-					wtCt = filt - scaleZeroCt()
-				}
-			}
-		} else if (appState.isWeight()) {
-			if (!isStable(raw, filt))
-				appState.toUnstable()
-		} else if (appState.isExit()) {
-			return
-		}
-		if (appState.isZero()) calZero(filt, 0)
-		if (appState.isWeight()) calZero(filt, wtCt)
-
-		updateRelay(wt)
-		updateUi(raw, filt, wt)
+	// Get started
+	reqLoadSettings(settingsXhr=>{
+		if (settingsXhr.readyState!==4) return
+		knobs = JSON.parse(settingsXhr.responseText)
 		schUpd()
-	}
-	schUpd()
+	})
 
 	return {
-		exit: _=>appState.toExit()
+		'exit': _=>appState.toExit()
 	}
 })()
