@@ -1,25 +1,35 @@
 <!DOCTYPE html>
 <html>
 <head><style>
-body                      { text-align: center; overflow: hidden; }
+body {
+	text-align: center;
+	overflow: hidden;
+	background-color: oklch(0.44 0.03 248.39);
+	color: oklch(0.69 0.04 138.54);
+}
 *                         { font-family: 'Cascadia Mono'; font-size: 30px; }
-#readout                  { font-size: 400%; }
+#readout                  { font-size: 1600%; transform: scaleX(0.8); }
+#status                   { font-size: 50%; }
 .knobs span, .knobs input { display: inline-block; width: 10em; }
-.knobs span[id]           { cursor: pointer; background-color: #ddd; }
-input                     { text-align: right; }
+.knobs span[id]           { cursor: pointer; background-color: oklch(0.33 0.04 248.38); }
+input                     {
+	text-align: right;
+	background-color: oklch(0.44 0.03 248.39);
+	color: oklch(0.69 0.04 138.54);
+}
 #live                     { width: 1000px; margin:0 auto; }
-#live div                 { position: relative; height: 20px; }
+#live div                 { position: relative; height: 5px; }
 #chart {
 	overflow-x: hidden;
 	width     : 1000px;
 	margin    : 0 auto;
-	border    : 1px solid #ccc;
+	border    : 1px solid oklch(0.33 0.04 248.38);
 	background: repeating-linear-gradient(
 		to right,
 		#00000000 0,
 		#00000000 70.5px,
-		#ccc 70.5px,
-		#ccc 71.5px);
+		oklch(0.33 0.04 248.38) 70.5px,
+		oklch(0.33 0.04 248.38) 71.5px);
 }
 #chart div                { position: relative; height: 1px; border: 0 solid rgb(225, 166, 129); }
 </style></head>

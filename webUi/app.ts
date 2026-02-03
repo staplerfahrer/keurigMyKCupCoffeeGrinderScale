@@ -57,6 +57,9 @@ var app=(() => {
 			model.st = to
 		} else
 
+		if (model.st === model.states.Weight && to === model.states.Unstable) {
+			model.st = to
+		} else
 		if (model.st === model.states.Weight && to === model.states.Zero) {
 			model.st = to
 		} else
@@ -93,7 +96,7 @@ var app=(() => {
 		x.timeout = timeout
 		x.open(method, url, true)
 		if (cb) x.onload = () => cb(x)
-		x.onerror = () => req(timeout, method, url, data, cb)
+		x.ontimeout = x.onabort = x.onerror = () => req(timeout, method, url, data, cb)
 		x.send(data)
 	}
 	var reqRaw = (cb: CallableFunction) => req(3000, 'GET', '/adcCount', null, cb)
@@ -117,7 +120,12 @@ var app=(() => {
 			return d
 		}
 		var color    = model.st === model.states.Unstable ? '#f41' : '#014'
-		var live     = (raw: number, color: string) => $('live').replaceChildren(makeBar(norm(raw), 20, 0, 0, color), makeBar(norm(raw) * 10**2, 20, 0, 0, color), makeBar(norm(raw) * 10**4, 20, 0, 0, color))
+		// var live     = (raw: number, color: string) => $('live').replaceChildren(makeBar(norm(raw), 20, 0, 0, color), makeBar(norm(raw) * 10**2, 20, 0, 0, color), makeBar(norm(raw) * 10**4, 20, 0, 0, color))
+		var live     = (meds: number[], color: string) => {
+			var n: Node[] = []
+			meds.toSorted((a, b) => a - b).forEach(m => n.push(makeBar(norm(m) * 10**4, 5, 0, 0, color)))
+			$('live').replaceChildren(...n)
+		}
 		var trace    = (filt: number, raw: number, isUnstable: boolean, color: string) => {
 			var x = norm(raw) * 10**4, bar
 			if (isUnstable)
@@ -130,9 +138,9 @@ var app=(() => {
 				c.removeChild(c.lastChild)
 			}
 		}
-		live(model.raw, color)
+		live(model.meds, color)
 		trace(model.filt, model.raw, model.st === model.states.Unstable, color)
-		$('status').innerText  = `${model.states.name[model.st]}, ADC ${model.raw}\n${model.meds.toSorted((a, b) => a - b).join(',')}`
+		$('status').innerText  = `${model.states.name[model.st]}, ADC ${model.raw}`
 		$('readout').innerHTML = `${rnd(model.wt / model.stableGramsLimit) * model.stableGramsLimit} g`
 		$('bCHO').innerText    = `${model.calibrationWeight} g offset`
 		$i('iC0').value        = '' + model.zeroCalibrationReading
@@ -185,6 +193,8 @@ var app=(() => {
 		if (model.st === model.states.Dispensing) {
 			if (model.wt > model.relayiAG + model.relayiDG)
 				stateChange(model.states.Unstable)
+			if (model.wt < model.relayiAG)
+				stateChange(model.states.Unstable)
 		} else
 		if (model.st === model.states.Exit)
 			return
@@ -199,7 +209,14 @@ var app=(() => {
 
 	function boot() {
 		reqLoadSettings((settingsXhr: XMLHttpRequest) => {
-			model = JSON.parse(settingsXhr.responseText)
+			var model2 = JSON.parse(settingsXhr.responseText)
+			// Save new model if different keys
+			if (!(Object.keys(model2).length === Object.keys(model).length &&
+					Object.keys(model2).every(k => Object.prototype.hasOwnProperty.call(model, k))))
+				reqSaveSettings()
+			else
+				model = model2
+
 			model.meds.length = model.medianSampleCount
 			updateUi()
 			setTimeout(() => reqRaw(newData), 1)
