@@ -1,0 +1,27 @@
+Zero: Zero
+Zero.shape: circle
+Unstable: Unstable
+Unstable.shape: circle
+Weight: Weight
+Weight.shape: circle
+Dispensing: Dispensing
+Dispensing.shape: circle
+Exit: Exit
+Exit.shape: circle
+
+Zero -> Zero
+Zero -> Unstable
+Zero -> Exit
+
+Unstable -> Zero
+Unstable -> Weight
+Unstable -> Exit
+
+Weight -> Zero
+Weight -> Dispensing: reqRelay(true)
+Weight -> Exit
+
+Dispensing -> Unstable: reqRelay(false)
+Dispensing -> Zero: reqRelay(false)
+Dispensing -> Weight: reqRelay(false)
+Dispensing -> Exit: reqRelay(false)

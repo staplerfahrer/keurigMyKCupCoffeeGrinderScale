@@ -1,1 +1,1 @@
-tsc --lib es2023,dom --target es2023 app.ts --outfile app.js2
+tsc --lib esnext,dom --target esnext --strict app.ts --outfile app.js2

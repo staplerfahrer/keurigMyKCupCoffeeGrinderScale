@@ -3,6 +3,7 @@
 <head><style>
 body                      { text-align: center; overflow: hidden; }
 *                         { font-family: 'Cascadia Mono'; font-size: 30px; }
+#readout                  { font-size: 400%; }
 .knobs span, .knobs input { display: inline-block; width: 10em; }
 .knobs span[id]           { cursor: pointer; background-color: #ddd; }
 input                     { text-align: right; }
@@ -14,26 +15,26 @@ input                     { text-align: right; }
 	margin    : 0 auto;
 	border    : 1px solid #ccc;
 	background: repeating-linear-gradient(
-		to right, 
-		#00000000 0, 
-		#00000000 70.5px, 
-		#ccc 70.5px, 
+		to right,
+		#00000000 0,
+		#00000000 70.5px,
+		#ccc 70.5px,
 		#ccc 71.5px);
 }
 #chart div                { position: relative; height: 1px; border: 0 solid rgb(225, 166, 129); }
 </style></head>
 <body>
+	<div id="readout"></div><br>
 	<div id="status"></div><br>
 	<div class="knobs">
 		<span id="bC0">Zero count</span>      <input id="iC0"><br>
-		<span id="bCHO">487.4 g offset</span> <input id="iCHO"><br>
+		<span id="bCHO">(...)</span>          <input id="iCHO"><br>
 		&nbsp;&nbsp;<span>Turn ON at</span>   <input id="iAG" type="number"> g<br>
 		&nbsp;&nbsp;<span>and dispense</span> <input id="iDG" type="number"> g<br>
 		<p>
 			<span id="save">Save</span>
 		</p>
 	</div>
-	<div id="readout"></div><br>
 	<div id="live"></div>
 	<div id="chart"></div>
 	<script src="/js"></script>
