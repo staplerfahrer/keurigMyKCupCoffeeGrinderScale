@@ -1,33 +1,19 @@
 var app=(() => {
 	var model = {
-		states: {
-			Unstable  : 0,
-			Zero      : 1,
-			Weight    : 2,
-			Dispensing: 3,
-			Exit      : 4,
-			name      : [
-				"Unstable",
-				"Zero",
-				"Weight",
-				"Dispensing",
-				"Exit"
-			]
-		},
-		stableGramsLimit           :       1,
-		medianSampleCount          :      18,
-		zeroCalibrationReading     :       0,
-		highWeightCalibrationOffset: 348_491,
-		calibrationWeight          :   487.4,
-		relayiAG                   :      19,
-		relayiDG                   :      12,
-		st                         :       0,
-		raw                        :       0,
-		meds                       :     [0],
-		filt                       :       0,
-		stableCount                :       0,
-		wt                         :       0,
-		offset                     :       0,
+		'sG':       1, /* grams stability limit */
+		'nM':      18, /* size of median sample set */
+		'c0':       0, /* 0 g ADC reading */
+		'hO': 348_491, /* relative calibration points above 0 g reading */
+		'hG':   487.4, /* calibration weight in grams */
+		'AG':      19, /* relay activation lower limit grams */
+		'DG':      12, /* dispense grams */
+		'st':       0, /* current state */
+		'rw':       0, /* raw reading */
+		'md':     [0], /* sample set for taking the median */
+		'fl':       0, /* filtered reading */
+		'sc':       0, /* counter to determine stability */
+		'wt':       0, /* weight in grams */
+		'of':       0, /* weight reading relative to 0 point */
 	}
 
 	// JS convenience
@@ -35,59 +21,50 @@ var app=(() => {
 	var $  = (i: string) => $d.getElementById(i) as HTMLElement
 	var $i = (i: string) => $d.getElementById(i) as HTMLInputElement
 
+	var states = {
+		Unstable  : 0,
+		Zero      : 1,
+		Weight    : 2,
+		Dispensing: 3,
+		Exit      : 4,
+	}
+	var names = [
+		"Unstable",
+		"Zero",
+		"Weight",
+		"Dispensing",
+		"Exit"
+	]
+	var symbols = [
+		"&#x2248;",
+		"&#x25ef;",
+		"&#x2b1c;",
+		"&#x2234;",
+		""
+	]
+
 	var stateChange = (to: number) => {
-		console.log(model.states.name[to])
-		if (model.st === model.states.Zero && to === model.states.Zero) {
+		console.log(names[to])
+		if (model.st === states.Zero &&
+				[states.Zero, states.Unstable, states.Exit].indexOf(to) > -1) {
 			model.st = to
 		} else
-		if (model.st === model.states.Zero && to === model.states.Unstable) {
+		if (model.st === states.Unstable &&
+				[states.Zero, states.Weight, states.Exit].indexOf(to) > -1) {
 			model.st = to
 		} else
-		if (model.st === model.states.Zero && to === model.states.Exit) {
+		if (model.st === states.Weight &&
+				[states.Unstable, states.Zero, states.Dispensing, states.Exit].indexOf(to) > -1) {
 			model.st = to
+			if (to === states.Dispensing)
+				reqRelay(true)
 		} else
-
-		if (model.st === model.states.Unstable && to === model.states.Zero) {
-			model.st = to
-		} else
-		if (model.st === model.states.Unstable && to === model.states.Weight) {
-			model.st = to
-		} else
-		if (model.st === model.states.Unstable && to === model.states.Exit) {
-			model.st = to
-		} else
-
-		if (model.st === model.states.Weight && to === model.states.Unstable) {
-			model.st = to
-		} else
-		if (model.st === model.states.Weight && to === model.states.Zero) {
-			model.st = to
-		} else
-		if (model.st === model.states.Weight && to === model.states.Dispensing) {
-			model.st = to
-			reqRelay(true)
-		} else
-		if (model.st === model.states.Weight && to === model.states.Exit) {
-			model.st = to
-		} else
-
-		if (model.st === model.states.Dispensing && to === model.states.Unstable) {
+		if (model.st === states.Dispensing &&
+				[states.Unstable, states.Zero, states.Weight, states.Exit].indexOf(to) > -1) {
 			model.st = to
 			reqRelay(false)
 		} else
-		if (model.st === model.states.Dispensing && to === model.states.Zero) {
-			model.st = to
-			reqRelay(false)
-		} else
-		if (model.st === model.states.Dispensing && to === model.states.Weight) {
-			model.st = to
-			reqRelay(false)
-		} else
-		if (model.st === model.states.Dispensing && to === model.states.Exit) {
-			model.st = to
-			reqRelay(false)
-		} else
-			debugger
+		debugger
 	}
 
 	// Data I/O
@@ -105,10 +82,10 @@ var app=(() => {
 	var reqSaveSettings = () => req(3000, 'POST', '/settings', JSON.stringify(model), null)
 
 	// View
-	$('bC0').onclick   = () => stateChange(model.states.Zero)
-	$('bCHO').onclick  = () => $i('iCHO').value = '' + (model.filt - model.zeroCalibrationReading) // ????
-	$i('iAG').onchange = e => model.relayiAG = +(e.target as HTMLInputElement).value
-	$i('iDG').onchange = e => model.relayiDG = +(e.target as HTMLInputElement).value
+	$('bC0').onclick   = () => stateChange(states.Zero)
+	$('bCHO').onclick  = () => $i('iCHO').value = '' + (model.fl - model.c0) // ????
+	$i('iAG').onchange = e => model.AG = +(e.target as HTMLInputElement).value
+	$i('iDG').onchange = e => model.DG = +(e.target as HTMLInputElement).value
 	$('save').onclick  = reqSaveSettings
 
 	var updateUi = () => {
@@ -119,114 +96,107 @@ var app=(() => {
 			d.style = `width:${w}px;left:${v % 1000/*px*/ - w / 2 - bl}px;border-width:0 ${br}px 0 ${bl}px;background:${col};}`
 			return d
 		}
-		var color    = model.st === model.states.Unstable ? '#f41' : '#014'
-		// var live     = (raw: number, color: string) => $('live').replaceChildren(makeBar(norm(raw), 20, 0, 0, color), makeBar(norm(raw) * 10**2, 20, 0, 0, color), makeBar(norm(raw) * 10**4, 20, 0, 0, color))
-		var live     = (meds: number[], color: string) => {
+		var color    = model.st === states.Unstable ? '#f41' : '#014'
+		var live     = () => {
 			var n: Node[] = []
-			meds.toSorted((a, b) => a - b).forEach(m => n.push(makeBar(norm(m) * 10**4, 5, 0, 0, color)))
+			model.md.toSorted((a, b) => a - b).forEach(m => n.push(makeBar(norm(m) * 10**4, 5, 0, 0, color)))
 			$('live').replaceChildren(...n)
 		}
-		var trace    = (filt: number, raw: number, isUnstable: boolean, color: string) => {
-			var x = norm(raw) * 10**4, bar
-			if (isUnstable)
+		var trace    = () => {
+			var x = norm(model.rw) * 10**4, bar
+			if (model.st === states.Unstable)
 				bar = makeBar(x, 20, x % 1000 - 10, 1000 - x % 1000 - 9, color)
 			else
-				bar = makeBar(norm(filt) * 10**4, 3, max(filt - raw, 0), max(raw - filt, 0), color)
+				bar = makeBar(norm(model.fl) * 10**4, 3, max(model.fl - model.rw, 0), max(model.rw - model.fl, 0), color)
 
 			c.insertBefore(bar, c.firstChild)
-			if (c.children.length > 1000/*bars*/ && c.lastChild) {
+			if (c.children.length > 1000/*bars*/ && c.lastChild)
 				c.removeChild(c.lastChild)
-			}
 		}
-		live(model.meds, color)
-		trace(model.filt, model.raw, model.st === model.states.Unstable, color)
-		$('status').innerText  = `${model.states.name[model.st]}, ADC ${model.raw}`
-		$('readout').innerHTML = `${rnd(model.wt / model.stableGramsLimit) * model.stableGramsLimit} g`
-		$('bCHO').innerText    = `${model.calibrationWeight} g offset`
-		$i('iC0').value        = '' + model.zeroCalibrationReading
-		$i('iCHO').value       = '' + model.highWeightCalibrationOffset
-		$i('iAG').value        = '' + model.relayiAG
-		$i('iDG').value        = '' + model.relayiDG
+		live()
+		trace()
+		$('readout').innerHTML = `${symbols[model.st]} ${rnd(model.wt / model.sG) * model.sG} g`
+		$('status').innerText  = `${names[model.st]}, ADC ${model.rw}`
+		$('bCHO').innerText    = `${model.hG} g offset`
+		$i('iC0').value        = '' + model.c0
+		$i('iCHO').value       = '' + model.hO
+		$i('iAG').value        = '' + model.AG
+		$i('iDG').value        = '' + model.DG
 	}
 
 	var newData = (x: XMLHttpRequest) => {
-		var ctPerGram = () => model.highWeightCalibrationOffset / model.calibrationWeight
-		var weight    = (filt: number) => (filt - model.zeroCalibrationReading) / ctPerGram()
-		var calZero   = (filt: number, offset: number) => model.zeroCalibrationReading = rnd(filt - offset)
+		var ctPerGram = () => model.hO / model.hG
+		var weight    = (filt: number) => (filt - model.c0) / ctPerGram()
+		var calZero   = (filt: number, offset: number) => model.c0 = rnd(filt - offset)
 		var median    = (a: number[]) => a.toSorted((a, b) => a - b)[M.floor(a.length / 2)] || 0
 		var isStable  = (raw: number, filt: number) => {
-			model.stableCount = M.abs(raw - filt) < ctPerGram() * model.stableGramsLimit
-				? M.min(model.stableCount + 1, 100)
+			model.sc = M.abs(raw - filt) < ctPerGram() * model.sG
+				? M.min(model.sc + 1, 100)
 				: 0
-			return model.stableCount > 10
+			return model.sc > 10
 		}
 
 
-		model.raw  = JSON.parse(x.responseText)['adcCount']
-		model.meds.shift()
-		model.meds.push(model.raw)
-		model.filt = median(model.meds) * 0.3 + model.filt * 0.7
-		model.wt   = weight(model.filt)
+		model.rw = JSON.parse(x.responseText)['adcCount']
+		model.md.shift()
+		model.md.push(model.rw)
+		model.fl = median(model.md) * 0.3 + model.fl * 0.7
+		model.wt = weight(model.fl)
 
 
-		if (model.st === model.states.Zero) {
-			if (!isStable(model.raw, model.filt))
-				stateChange(model.states.Unstable)
+		if (model.st === states.Zero) {
+			if (!isStable(model.rw, model.fl))
+				stateChange(states.Unstable)
 		} else
-		if (model.st === model.states.Unstable) {
-			if (isStable(model.raw, model.filt)) {
-				if (model.zeroCalibrationReading === 0 || (model.wt !== null && model.wt < model.stableGramsLimit)) {
-					stateChange(model.states.Zero)
+		if (model.st === states.Unstable) {
+			if (isStable(model.rw, model.fl)) {
+				if (model.c0 === 0 || (model.wt !== null && model.wt < model.sG)) {
+					stateChange(states.Zero)
 				} else {
-					stateChange(model.states.Weight)
-					model.offset = model.filt - model.zeroCalibrationReading
+					stateChange(states.Weight)
+					model.of = model.fl - model.c0
 				}
 			}
 		} else
-		if (model.st === model.states.Weight) {
-			if (!isStable(model.raw, model.filt))
-				stateChange(model.states.Unstable)
+		if (model.st === states.Weight) {
+			if (!isStable(model.rw, model.fl))
+				stateChange(states.Unstable)
 			else
-			if (model.wt > model.relayiAG && model.wt < model.relayiAG + model.relayiDG)
-				stateChange(model.states.Dispensing)
+			if (model.wt > model.AG && model.wt < model.AG + model.DG)
+				stateChange(states.Dispensing)
 		} else
-		if (model.st === model.states.Dispensing) {
-			if (model.wt > model.relayiAG + model.relayiDG)
-				stateChange(model.states.Unstable)
-			if (model.wt < model.relayiAG)
-				stateChange(model.states.Unstable)
+		if (model.st === states.Dispensing) {
+			if (model.wt > model.AG + model.DG)
+				stateChange(states.Unstable)
+			if (model.wt < model.AG)
+				stateChange(states.Unstable)
 		} else
-		if (model.st === model.states.Exit)
+		if (model.st === states.Exit)
 			return
 
 		// Zero tracking without or with weight
-		if (model.st === model.states.Zero)   calZero(model.filt, 0)
-		if (model.st === model.states.Weight) calZero(model.filt, model.offset)
+		if (model.st === states.Zero)   calZero(model.fl, 0)
+		if (model.st === states.Weight) calZero(model.fl, model.of)
 
 		updateUi()
 		setTimeout(() => reqRaw(newData), 1)
 	}
 
-	function boot() {
-		reqLoadSettings((settingsXhr: XMLHttpRequest) => {
-			var model2 = JSON.parse(settingsXhr.responseText)
-			// Save new model if different keys
-			if (!(Object.keys(model2).length === Object.keys(model).length &&
-					Object.keys(model2).every(k => Object.prototype.hasOwnProperty.call(model, k))))
-				reqSaveSettings()
-			else
-				model = model2
+	reqLoadSettings((settingsXhr: XMLHttpRequest) => {
+		var model2 = JSON.parse(settingsXhr.responseText)
+		// Save new model if different keys
+		if (!(Object.keys(model2).length === Object.keys(model).length &&
+				Object.keys(model2).every(k => Object.prototype.hasOwnProperty.call(model, k))))
+			reqSaveSettings()
+		else
+			model = model2
 
-			model.meds.length = model.medianSampleCount
-			updateUi()
-			setTimeout(() => reqRaw(newData), 1)
-		})
-	}
+		model.md.length = model.nM
+		updateUi()
+		setTimeout(() => reqRaw(newData), 1)
+	})
 
 	return {
-		'boot' : boot,
-		'exit' : () => stateChange(model.states.Exit)
+		'exit' : () => stateChange(states.Exit)
 	}
 })()
-
-app.boot()

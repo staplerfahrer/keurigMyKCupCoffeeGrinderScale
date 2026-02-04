@@ -6,7 +6,7 @@
 		{
 			"label": "build",
 			"type": "shell",
-			"command": "ts & ugg",
+			"command": "ts & ugg & \"c:\\program files\\d2\\d2.exe\" states.d2 & code states.svg",
 			"options": {
 				"cwd": "webUi"
 			},
