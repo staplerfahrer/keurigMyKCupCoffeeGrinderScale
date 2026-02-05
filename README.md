@@ -1,6 +1,6 @@
 # Keurig My K-Cup Coffee Grinder Scale
 
-<img width="1148" height="1022" alt="Screenshot 2026-01-22 101406" src="https://github.com/user-attachments/assets/e0e08c8d-2d91-4e2f-9f7a-10030581b9ad" />
+<img width="1833" height="1520" alt="image" src="https://github.com/user-attachments/assets/9acc6422-d844-4cc1-b14d-251ccca084d5" />
 
 An IoT scale &amp; web UI for a scale to automatically grind &amp; dispense the desired amount of coffee into a Keurig My K-Cup™.
 
